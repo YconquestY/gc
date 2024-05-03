@@ -1,0 +1,11 @@
+[package]
+
+edition = "2021"
+
+name = "l3vm"
+version = "0.0.1"
+
+[features]
+
+# Generate memory access traces
+tracing = []
