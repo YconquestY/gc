@@ -1,0 +1,14 @@
+# compiler
+/compiler/.bsp/
+/compiler/**/target/
+/compiler/out.l3a
+
+# VM
+/vm/c/bin/
+/vm/rust/target/
+
+# test
+
+.vscode/
+.metals/
+.DS_Store
