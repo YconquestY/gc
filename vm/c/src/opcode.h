@@ -1,6 +1,7 @@
 #ifndef OPCODE_H
 #define OPCODE_H
 
+/** @brief The virtual machine supports 31 operations. **/
 typedef enum {
   opcode_ADD, opcode_SUB, opcode_MUL, opcode_DIV, opcode_MOD,
   opcode_LSL, opcode_LSR, opcode_AND, opcode_OR, opcode_XOR,

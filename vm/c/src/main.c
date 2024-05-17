@@ -62,8 +62,12 @@ static void parse_args(int argc, char* argv[], options_t* opts) {
   }
 }
 
-// Memory/size alignment
-
+/** Round down requested memory size to nearest multiple of alignment
+ * 
+ * @param value Requested memory size (in B)
+ * @param align Required memory alignment (in B)
+ * @return Rounded-down and aligned memory size (in B)
+**/
 static size_t align_down(size_t value, size_t align) {
   assert(align > 0 && (align & (align - 1)) == 0); /* check power of 2 */
   return value & ~(align - 1);
@@ -96,7 +100,8 @@ int main(int argc, char* argv[]) {
   }
   if (options.memory_size == 0)
     fail("invalid memory size %zd", options.memory_size);
-
+  /// `alignof` is non-standard C extension, see
+  /// https://en.cppreference.com/w/c/language/_Alignof
   const int value_align = alignof(value_t);
 
   memory* memory = memory_new(align_down(options.memory_size, value_align));

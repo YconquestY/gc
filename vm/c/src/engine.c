@@ -43,10 +43,16 @@ static inline unsigned int instr_extract_u(value_t instr, int start, int len) {
   return (instr >> start) & ((1 << len) - 1);
 }
 
+/**
+ * 
+ * @param instr
+ * @param start
+ * @param len
+**/
 static inline int instr_extract_s(value_t instr, int start, int len) {
   int bits = (int)instr_extract_u(instr, start, len);
   int m = 1 << (len - 1);
-  return (bits ^ m) - m;
+  return (bits ^ m) - m; // 2's complement
 }
 
 static inline opcode_t instr_opcode(value_t instr) {
@@ -99,12 +105,12 @@ static inline int instr_d27(value_t instr) {
 
 // A call instruction, which saves the caller's context in the frame
 // of the callee, before switching to it.
-#define INSTR_C(L, P) INSTR_P(L, P, {                           \
-      value_t* callee_frame = other_frame;                      \
-      callee_frame[0] = addr_p_to_v(memory_start, pc + 1);      \
-      callee_frame[1] = addr_p_to_v(memory_start, curr_frame);  \
-      other_frame = curr_frame;                                 \
-      curr_frame = callee_frame;                                \
+#define INSTR_C(L, P) INSTR_P(L, P, {                                             \
+      value_t* callee_frame = other_frame;                                        \
+      callee_frame[0] = addr_p_to_v(memory_start, pc + 1);     /* Caller's PC */  \
+      callee_frame[1] = addr_p_to_v(memory_start, curr_frame); /* Caller's FP */  \
+      other_frame = curr_frame;                                                   \
+      curr_frame = callee_frame;                                                  \
     })
 
 value_t engine_run(engine* self) {
@@ -112,7 +118,7 @@ value_t engine_run(engine* self) {
 
   value_t empty_frame[] = {
     header_pack(tag_RegisterFrame, CONTEXT_SIZE),    // header
-    0, 0,                                            // context
+    0, 0,                                            // context: PC & FP
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // registers
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -145,7 +151,8 @@ value_t engine_run(engine* self) {
   memory_set_heap_start(self->memory, self->free_boundary);
 
   // Interpret program
-
+  /* `labels` is an array of `void*`, where each pointer, a.k.a. label, is the
+   * address of the compiler binary. `&&` is used to get the address of it. */
   void** labels[] = {
     [opcode_ADD]    = &&l_ADD,
     [opcode_SUB]    = &&l_SUB,
@@ -188,7 +195,7 @@ value_t engine_run(engine* self) {
   INSTR_L(l_MUL, Ra = Rb * Rc);
   INSTR_L(l_DIV, Ra = (value_t)(sRb / sRc));
   INSTR_L(l_MOD, Ra = (value_t)(sRb % sRc));
-  INSTR_L(l_LSL, Ra = Rb << (Rc & 0x1F));
+  INSTR_L(l_LSL, Ra = Rb << (Rc & 0x1F)); /// Shift no more than 31b
   INSTR_L(l_LSR, Ra = (value_t)(sRb >> (Rc & 0x1F)));
   INSTR_L(l_AND, Ra = Rb & Rc);
   INSTR_L(l_OR,  Ra = Rb | Rc);
@@ -282,12 +289,14 @@ value_t engine_run(engine* self) {
   INSTR_L(l_IO, {
       switch (instr_extract_u(*pc, 8, 8)) {
       case 0: {
-        int maybe_byte = getchar_unlocked();
+        //int maybe_byte = getchar_unlocked();
+        int maybe_byte = getchar();
         Ra = (value_t)(maybe_byte != EOF ? maybe_byte : -1);
       } break;
 
       case 1: {
-        putchar_unlocked((uint8_t)Ra);
+        //putchar_unlocked((uint8_t)Ra);
+        putchar((uint8_t)Ra);
       } break;
 
       default:

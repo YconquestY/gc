@@ -19,7 +19,7 @@ char* memory_get_identity() {
 }
 
 memory* memory_new(size_t total_byte_size) {
-  value_t* memory_start = calloc(1, total_byte_size);
+  value_t* memory_start = (value_t*) calloc(1, total_byte_size);
   if (!memory_start)
     fail("cannot allocate %zd bytes of memory", total_byte_size);
   value_t* memory_end = memory_start + (total_byte_size / sizeof(value_t));
