@@ -7,13 +7,13 @@
 #include "memory.h"
 #include "fail.h"
 #include "block_header.h"
-
+/*
 struct memory {
   value_t* start;
   value_t* end;
   value_t* free;
 };
-
+*/
 char* memory_get_identity() {
   return "no GC (memory is never freed)";
 }
@@ -25,7 +25,8 @@ memory* memory_new(size_t total_byte_size) {
   value_t* memory_end = memory_start + (total_byte_size / sizeof(value_t));
 
   memory* self = calloc(1, sizeof(memory));
-  if (!self) fail("cannot allocate memory");
+  if (!self)
+  fail("cannot allocate memory");
   self->start = memory_start;
   self->end = memory_end;
   return self;
@@ -44,6 +45,10 @@ value_t* memory_get_end(memory* self) {
   return self->end;
 }
 
+void memory_set_bitmap(memory* self, value_t* bitmap) {
+  self->bitmap = bitmap;
+}
+
 void memory_set_heap_start(memory* self, value_t* heap_start) {
   self->free = heap_start;
 }
@@ -53,12 +58,20 @@ value_t* memory_allocate(memory* self,
                          value_t size,
                          value_t* root) {
   const value_t total_size = size + HEADER_SIZE;
-  if (self->free + total_size > self->end)
+  if (self->free + total_size > self->end) {
+    /// TODO: garbage collection if memory allocation fails
+    /// TODO: retry memory allocation
     fail("no memory left (block of size %u requested)", size);
-
+  }
+  /// TODO: traverse free list for new address
   value_t* block = &self->free[HEADER_SIZE];
+  /// Set corresponding bit in bitmap
+  uint32_t bitmap_idx = block - self->free;
+  self->bitmap[bitmap_idx >> 5] |= 1 << (bitmap_idx & 0x1F);
+  
   block_set_tag_size(block, tag, size);
-  self->free += total_size;
+  /// TODO: update free list
+  //self->free += total_size;
 
   return block;
 }

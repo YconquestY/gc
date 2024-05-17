@@ -16,7 +16,7 @@
 
 struct engine {
   memory* memory;
-  value_t* free_boundary;
+  value_t* free_boundary; // persistent once set
 };
 
 engine* engine_new(memory* memory) {
@@ -148,6 +148,12 @@ value_t engine_run(engine* self) {
   self->free_boundary += sizeof(empty_frame) / sizeof(value_t);
 
   value_t* memory_start = memory_get_start(self->memory);
+
+  /// Allocate bitmap
+  uint32_t num_bit = ((uint32_t) self->memory->end - (uint32_t) self->free_boundary) >> 2,
+           num_word = (num_bit + 33 - 1) / 33;
+  memory_set_bitmap(self->memory, self->free_boundary);
+  self->free_boundary += num_word;
   memory_set_heap_start(self->memory, self->free_boundary);
 
   // Interpret program
