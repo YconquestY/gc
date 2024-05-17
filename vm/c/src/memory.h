@@ -11,7 +11,12 @@ typedef enum {
   tag_RegisterFrame = 0xFF
 } tag_t;
 
-typedef struct memory memory;
+typedef struct memory {
+  value_t* start;
+  value_t* end;
+  value_t* free; // persistent once set
+  value_t* bitmap;
+} memory;
 
 // Returns a string identifying the memory module.
 char* memory_get_identity(void);
@@ -27,6 +32,14 @@ value_t* memory_get_start(memory* self);
 
 // Get the address just after the end of the memory area.
 value_t* memory_get_end(memory* self);
+
+/**
+ * @brief 
+ * 
+ * @param self 
+ * @param bitmap
+**/
+void memory_set_bitmap(memory* self, value_t* bitmap);
 
 // Set the heap start, following the code area.
 void memory_set_heap_start(memory* self, value_t* heap_start);
