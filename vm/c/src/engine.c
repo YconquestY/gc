@@ -150,11 +150,25 @@ value_t engine_run(engine* self) {
   value_t* memory_start = memory_get_start(self->memory);
 
   /// Allocate bitmap
-  uint32_t num_bit = ((uint32_t) self->memory->end - (uint32_t) self->free_boundary) >> 2,
+  uint32_t //num_bit = ((uint32_t) self->memory->end - (uint32_t) self->free_boundary) >> 2,
+           num_bit = (uint32_t) (self->memory->end - self->free_boundary),
            num_word = (num_bit + 33 - 1) / 33;
+  assert(num_bit > 1); // make sure there is space left after bitmap allocation
   memory_set_bitmap(self->memory, self->free_boundary);
   self->free_boundary += num_word;
   memory_set_heap_start(self->memory, self->free_boundary);
+
+  /// Initialize free list heads
+  for (uint32_t i = 0; i < NUM_HEAD; i++) {
+    self->memory->heads[i] = NULL;
+  }
+  uint32_t heap_size = (uint32_t) (self->memory->end - self->free_boundary); // number of words in heap, aka total size of the initial free block
+  assert(heap_size >= HEADER_SIZE + 1); // The heap must have enough space for one free block.
+  if (heap_size - HEADER_SIZE - 1 >= NUM_HEAD - 1) {
+    self->memory->heads[NUM_HEAD - 1] = self->free_boundary[HEADER_SIZE]; 
+  } else {
+    self->memory->heads[heap_size - HEADER_SIZE - 1] = self->free_boundary[HEADER_SIZE];
+  }
 
   // Interpret program
   /* `labels` is an array of `void*`, where each pointer, a.k.a. label, is the
