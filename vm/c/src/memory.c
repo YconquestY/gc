@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
+#include <stdbool.h>
 
 #include "memory.h"
 #include "fail.h"
@@ -53,27 +54,46 @@ void memory_set_heap_start(memory* self, value_t* heap_start) {
   self->free = heap_start;
 }
 
+value_t* memory_get_block(memory* self,
+                          uint32_t idx,
+                          tag_t tag,
+                          value_t size,
+                          value_t* root) {
+
+  value_t* block = self->heads[idx];
+  /// Set corresponding bit in bitmap
+  uint32_t bitmap_idx = block - self->free;
+  self->bitmap[bitmap_idx >> 5] |= 1 << (bitmap_idx & 0x1F);
+  block_set_tag_size(block, tag, size);
+  /// TODO: update free list, i.e. split
+  //self->free += total_size;
+  value_t* next_fb = self->heads[idx][HEADER_SIZE] ;
+
+  return block;
+
+} 
+
 value_t* memory_allocate(memory* self,
                          tag_t tag,
                          value_t size,
                          value_t* root) {
+  size = max(size, 1);
   const value_t total_size = size + HEADER_SIZE;
-  if (self->free + total_size > self->end) {
-    /// TODO: garbage collection if memory allocation fails
-    /// TODO: retry memory allocation
-    fail("no memory left (block of size %u requested)", size);
+  uint32_t idx = min(size - 1, NUM_HEAD - 1);
+  for (uint32_t _idx = idx; _idx < NUM_HEAD; _idx++) {
+    if (self->heads[_idx]) {
+      return memory_get_block(self, _idx, tag, size, root);
+    }
   }
-  /// TODO: traverse free list for new address
-  value_t* block = &self->free[HEADER_SIZE];
-  /// Set corresponding bit in bitmap
-  uint32_t bitmap_idx = block - self->free;
-  self->bitmap[bitmap_idx >> 5] |= 1 << (bitmap_idx & 0x1F);
-  
-  block_set_tag_size(block, tag, size);
-  /// TODO: update free list
-  //self->free += total_size;
 
-  return block;
+  /// TODO: garbage collection
+
+  for (uint32_t _idx = idx; _idx < idx; _idx++) {
+    if (self->heads[_idx]) {
+      return memory_get_block(self, _idx, tag, size, root);
+    }
+  }
+  fail("no memory left (block of size %u requested)", size);
 }
 
 value_t* memory_copy_of_block(memory* self, value_t* block, value_t* root) {

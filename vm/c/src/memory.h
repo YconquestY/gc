@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include "vmtypes.h"
 
+#define NUM_HEAD 32
+
 typedef enum {
   tag_FreeBlock = 0x00,
   tag_Function = 0x01,
@@ -16,6 +18,7 @@ typedef struct memory {
   value_t* end;
   value_t* free; // persistent once set
   value_t* bitmap;
+  value_t* heads[NUM_HEAD];
 } memory;
 
 // Returns a string identifying the memory module.
@@ -43,6 +46,18 @@ void memory_set_bitmap(memory* self, value_t* bitmap);
 
 // Set the heap start, following the code area.
 void memory_set_heap_start(memory* self, value_t* heap_start);
+
+/**
+ * @brief 
+ * 
+ * @param self 
+ * @param idx index to free list heads
+ * @param tag 
+ * @param size 
+ * @param root 
+ * @return 
+**/
+value_t* memory_get_block(memory* self, uint32_t idx, tag_t tag, value_t size, value_t* root);
 
 // Allocate a block with the given `tag` and `size`, using `root` (the
 // frame pointer) in case garbage collection has to be performed.
