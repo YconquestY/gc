@@ -10,7 +10,10 @@ typedef enum {
   tag_FreeBlock = 0x00,
   tag_Function = 0x01,
   tag_String = 0x02,
-  tag_RegisterFrame = 0xFF
+  /* A tag takes 6b. Highest header 2b indicates how much block capacity
+   * exceeds block size.
+   */
+  tag_RegisterFrame = 0x3F
 } tag_t;
 
 typedef struct memory {
@@ -18,7 +21,7 @@ typedef struct memory {
   value_t* end;
   value_t* free; // persistent once set
   value_t* bitmap;
-  value_t* heads[NUM_HEAD];
+  value_t  heads[NUM_HEAD]; // L₃VM virtual address
 } memory;
 
 // Returns a string identifying the memory module.
@@ -51,13 +54,20 @@ void memory_set_heap_start(memory* self, value_t* heap_start);
  * @brief 
  * 
  * @param self 
- * @param idx index to free list heads
  * @param tag 
  * @param size 
  * @param root 
  * @return 
 **/
-value_t* memory_get_block(memory* self, uint32_t idx, tag_t tag, value_t size, value_t* root);
+value_t* memory_get_block(memory* self, tag_t tag, value_t size, value_t* root);
+
+/**
+ * @brief
+ * 
+ * @param self
+ * @param root
+**/
+void memory_collect_garbage(memory* self, value_t* root);
 
 // Allocate a block with the given `tag` and `size`, using `root` (the
 // frame pointer) in case garbage collection has to be performed.
