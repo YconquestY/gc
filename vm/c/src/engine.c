@@ -160,16 +160,16 @@ value_t engine_run(engine* self) {
 
   /// Initialize free list heads
   for (uint32_t i = 0; i < NUM_HEAD; i++) {
-    self->memory->heads[i] = NULL;
+    self->memory->heads[i] = UINT32_MAX;
   }
   uint32_t heap_size = (uint32_t) (self->memory->end - self->free_boundary); // number of words in heap, aka total size of the initial free block
   assert(heap_size >= HEADER_SIZE + 1); // The heap must have enough space for one free block.
   if (heap_size - HEADER_SIZE - 1 >= NUM_HEAD - 1) {
-    self->memory->heads[NUM_HEAD - 1] = addr_p_to_v(self->memory->start, self->free_boundary[HEADER_SIZE]);
+    self->memory->heads[NUM_HEAD - 1] = addr_p_to_v(self->memory->start, &self->free_boundary[HEADER_SIZE]);
   } else {
-    self->memory->heads[heap_size - HEADER_SIZE - 1] = addr_p_to_v(self->memory->start, self->free_boundary[HEADER_SIZE]);
+    self->memory->heads[heap_size - HEADER_SIZE - 1] = addr_p_to_v(self->memory->start, &self->free_boundary[HEADER_SIZE]);
   }
-  block_set_extra_tag_size(self->free_boundary[HEADER_SIZE], 0, tag_FreeBlock, heap_size - HEADER_SIZE);
+  block_set_extra_tag_size(&self->free_boundary[HEADER_SIZE], 0, tag_FreeBlock, heap_size - HEADER_SIZE);
   self->free_boundary[HEADER_SIZE] = UINT32_MAX;
 
   // Interpret program

@@ -23,7 +23,8 @@
  * Note that
  * 1. block capacity is necessary for strings and functions in that they are
  *    represented as block (of characters/closure). Block size matters;
- * 2. a free block or top-frame block must have its `extra` field set to 0.
+ * 2. a free block or top-frame block must have its `extra` field set to 0, but
+ *    the in-heap copy of a top-frame block may have `extra` 1.
  */
 
 // Header management
