@@ -68,6 +68,9 @@ value_t* memory_get_block(memory* self,
 
   uint32_t idx = min(capacity - 1, NUM_HEAD - 1);
   for ( ; idx < NUM_HEAD; idx++) {
+    if (idx != NUM_HEAD - 1 && capacity == idx) {
+      continue;
+    }
     value_t v_previous = UINT32_MAX,
             v_current = self->heads[idx];
     while (v_current != UINT32_MAX) {
