@@ -275,10 +275,14 @@ void memory_free_block(memory* self, value_t* block) {
   /// reset block tag
   value_t fb_size = block_capacity(block);
   block_set_tag_size(block, tag_FreeBlock, fb_size);
-  /// insert block backto free list
+  /// insert block backto free list in ascending address
   uint32_t idx = min(fb_size - 1, NUM_HEAD - 1);
-  *block = self->heads[idx];
-  self->heads[idx] = addr_p_to_v(self->start, block);
+  value_t* ptr = &self->heads[idx];
+  while(*ptr < addr_p_to_v(self->start, block) && *ptr != UINT32_MAX) {
+    ptr = addr_v_to_p(self->start, *ptr);
+  }
+  *block = *ptr;
+  *ptr = addr_p_to_v(self->start, block);
   /// clear freed block
   memset(&block[1], 0, (fb_size - 1) * sizeof(value_t));
 }
