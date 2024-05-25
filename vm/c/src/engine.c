@@ -117,7 +117,7 @@ value_t engine_run(engine* self) {
   // Emit top frames
 
   value_t empty_frame[] = {
-    header_pack(0, tag_RegisterFrame, CONTEXT_SIZE), // header
+    header_pack(tag_RegisterFrame, CONTEXT_SIZE),    // header
     0, 0,                                            // context: PC & FP
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // registers
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -169,7 +169,7 @@ value_t engine_run(engine* self) {
   } else {
     self->memory->heads[heap_size - HEADER_SIZE - 1] = addr_p_to_v(self->memory->start, &self->free_boundary[HEADER_SIZE]);
   }
-  block_set_extra_tag_size(&self->free_boundary[HEADER_SIZE], 0, tag_FreeBlock, heap_size - HEADER_SIZE);
+  block_set_tag_size(&self->free_boundary[HEADER_SIZE], tag_FreeBlock, heap_size - HEADER_SIZE);
   self->free_boundary[HEADER_SIZE] = UINT32_MAX;
 
   // Interpret program
@@ -280,7 +280,7 @@ value_t engine_run(engine* self) {
         other_frame[i++] = Ra; other_frame[i++] = Rb; other_frame[i++] = Rc;
         pc += 1;
       } while (instr_opcode(*pc) == opcode_ARGS);
-      block_set_extra_tag_size(other_frame, 0, tag_RegisterFrame, i);
+      block_set_tag_size(other_frame, tag_RegisterFrame, i);
       goto *labels[instr_opcode(*pc)];
     });
 
@@ -290,7 +290,7 @@ value_t engine_run(engine* self) {
       int size_to_clear = (new_size - curr_size) * sizeof(value_t);
       if (size_to_clear > 0)
         memset(&curr_frame[curr_size], 0, size_to_clear);
-      block_set_extra_tag_size(curr_frame, 0, tag_RegisterFrame, new_size);
+      block_set_tag_size(curr_frame, tag_RegisterFrame, new_size);
     });
 
   INSTR_L(l_BALO, {

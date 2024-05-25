@@ -74,11 +74,7 @@ value_t* memory_get_block(memory* self,
       value_t* p_previous = addr_v_to_p(self->start, v_previous),
              * p_current = addr_v_to_p(self->start, v_current);
       value_t _block_size = block_size(p_current);
-      if ((_block_size == capacity) || (_block_size == capacity + 1)) {
-        if (_block_size == capacity + 1) {
-          extra += 1;
-          capacity = req_size + extra;
-        }
+      if (_block_size == capacity) {
         uint32_t bitmap_idx = (uint32_t) (p_current - self->free);
         self->bitmap[bitmap_idx >> 5] |= ((uint32_t) 1) << (bitmap_idx & 0x1F); // side effect
         if (v_previous == UINT32_MAX) { // remove free list head
@@ -86,7 +82,7 @@ value_t* memory_get_block(memory* self,
         } else { // remove internal free block
           *p_previous = *p_current;
         }
-        block_set_extra_tag_size(p_current, extra, tag, req_size);
+        block_set_tag_size(p_current, tag, req_size);
         return p_current;
       }
       else if (_block_size > capacity + 1) {
@@ -95,7 +91,7 @@ value_t* memory_get_block(memory* self,
         /// Remaining words form a new free block.
         value_t* p_new_fb = p_current + capacity + HEADER_SIZE;
         value_t new_fb_size = _block_size - capacity - HEADER_SIZE;
-        block_set_extra_tag_size(p_new_fb, 0, tag_FreeBlock, new_fb_size);
+        block_set_tag_size(p_new_fb, tag_FreeBlock, new_fb_size);
         /// remove current free block
         if (v_previous == UINT32_MAX) { // free list head
           self->heads[idx] = *p_current;
@@ -107,7 +103,7 @@ value_t* memory_get_block(memory* self,
         *p_new_fb = self->heads[_idx];
         self->heads[_idx] = addr_p_to_v(self->start, p_new_fb);
         /// update allocated block
-        block_set_extra_tag_size(p_current, extra, tag, req_size);
+        block_set_tag_size(p_current, tag, req_size); // size 0, capacity 1 if 0 requested
         return p_current;
       }
       v_previous = v_current;
@@ -152,15 +148,6 @@ void memory_dfs(memory* self, value_t* root) {
   }
 }
 
-int countSetBits(uint32_t n) {
-    int count = 0;
-    while (n) {
-        n &= (n - 1); // Clear the least significant bit set to 1
-        count++;
-    }
-    return count;
-}
-
 /**
  * @brief 
  * 
@@ -186,13 +173,12 @@ void memory_sweep(memory* self) {
     if (block_tag(sweep) != tag_FreeBlock && !bit_set) {
       /// set bitmap entry of reachable blocks backto 1
       self->bitmap[bitmap_idx >> 5] |= ((uint32_t) 1) << (bitmap_idx & 0x1F);
-      //("ANCHOR 1\n");
 
       if (fb_wip) {
         /// reset memory content
         memset(fb_wip, 0, fb_size * sizeof(value_t));
         /// insert new (coalesced) free block
-        block_set_extra_tag_size(fb_wip, 0, tag_FreeBlock, fb_size);
+        block_set_tag_size(fb_wip, tag_FreeBlock, fb_size);
         uint32_t idx = min(fb_size - 1, NUM_HEAD - 1);
         *tails[idx] = addr_p_to_v(self->start, fb_wip); // insert to tail
         tails[idx] = fb_wip;
@@ -219,7 +205,7 @@ void memory_sweep(memory* self) {
    */
   if (fb_wip) {
     memset(fb_wip, 0, fb_size * sizeof(value_t));
-    block_set_extra_tag_size(fb_wip, 0, tag_FreeBlock, fb_size);
+    block_set_tag_size(fb_wip, tag_FreeBlock, fb_size);
     uint32_t idx = min(fb_size - 1, NUM_HEAD - 1);
     *tails[idx] = addr_p_to_v(self->start, fb_wip); // insert to tail
     tails[idx] = fb_wip;
@@ -285,7 +271,7 @@ void memory_free_block(memory* self, value_t* block) {
   self->bitmap[bitmap_idx >> 5] &= ~(((uint32_t) 1) << (bitmap_idx & 0x1F));
   /// reset block tag
   value_t fb_size = block_capacity(block);
-  block_set_extra_tag_size(block, 0, tag_FreeBlock, fb_size);
+  block_set_tag_size(block, tag_FreeBlock, fb_size);
   /// insert block backto free list
   uint32_t idx = min(fb_size - 1, NUM_HEAD - 1);
   *block = self->heads[idx];

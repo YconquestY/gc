@@ -10,10 +10,10 @@ typedef enum {
   tag_FreeBlock = 0x00,
   tag_Function = 0x01,
   tag_String = 0x02,
-  /* A tag takes 6b. Highest header 2b indicates how much block capacity
-   * exceeds block size.
+  /* A tag must take 8b, see
+   * https://edstem.org/eu/courses/1102/discussion/114055?comment=217765
    */
-  tag_RegisterFrame = 0x3F
+  tag_RegisterFrame = 0xFF
 } tag_t;
 
 typedef struct memory {
