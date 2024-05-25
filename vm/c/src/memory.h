@@ -59,7 +59,7 @@ void memory_set_heap_start(memory* self, value_t* heap_start);
  * @param root 
  * @return 
 **/
-value_t* memory_get_block(memory* self, tag_t tag, value_t size, value_t* root);
+value_t* memory_get_block(memory* self, tag_t tag, value_t size);
 
 /**
  * @brief
