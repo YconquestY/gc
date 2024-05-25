@@ -101,10 +101,16 @@ value_t* memory_get_block(memory* self,
         } else { // internal free block
           *p_previous = *p_current;
         }
-        /// insert new free block backto free list, potentially to another head
+        /// insert new free block backto free list, potentially to another head, in ascending address
         uint32_t _idx = min(new_fb_size - 1, NUM_HEAD - 1);
-        *p_new_fb = self->heads[_idx];
-        self->heads[_idx] = addr_p_to_v(self->start, p_new_fb);
+        value_t* ptr = &self->heads[_idx];
+        while(*ptr != UINT32_MAX && *ptr < addr_p_to_v(self->start, p_new_fb)) {
+          ptr = addr_v_to_p(self->start, *ptr);
+        }
+        *p_new_fb = *ptr;
+        *ptr = addr_p_to_v(self->start, p_new_fb);
+        // *p_new_fb = self->heads[_idx];
+        // self->heads[_idx] = addr_p_to_v(self->start, p_new_fb);
         /// update allocated block
         block_set_tag_size(p_current, tag, req_size); // size 0, capacity 1 if 0 requested
         return p_current;
