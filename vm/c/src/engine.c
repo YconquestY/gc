@@ -300,7 +300,12 @@ value_t engine_run(engine* self) {
   INSTR_L(l_BSIZ, Ra = block_size(addr_v_to_p(memory_start, Rb)));
   INSTR_L(l_BTAG, Ra = block_tag(addr_v_to_p(memory_start, Rb)));
   INSTR_L(l_BGET, {
-      assert(Rc < block_size(addr_v_to_p(memory_start, Rb)));
+      //assert(Rc < block_size(addr_v_to_p(memory_start, Rb)));
+      if (!(Rc < block_size(addr_v_to_p(memory_start, Rb)))) {
+        printf("block size: %u\n", block_size(addr_v_to_p(memory_start, Rb)));
+        printf("index: %u\n", Rc);
+        fail("invalid block access");
+      }
       Ra = addr_v_to_p(memory_start, Rb)[Rc];
     });
   INSTR_L(l_BSET, {
