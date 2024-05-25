@@ -11,6 +11,10 @@
 #include "fail.h"
 #include "block_header.h"
 #include "util.h"
+
+#define TFB_0 (self->bitmap - 258)
+#define TFB_1 (self->bitmap - 258 - 259)
+
 /*
 struct memory {
   value_t* start;
@@ -19,8 +23,7 @@ struct memory {
 };
 */
 char* memory_get_identity() {
-  /// TODO:
-  return "no GC (memory is never freed)";
+  return "Mark & sweep GC";
 }
 
 memory* memory_new(size_t total_byte_size) {
@@ -60,8 +63,7 @@ void memory_set_heap_start(memory* self, value_t* heap_start) {
 
 value_t* memory_get_block(memory* self,
                           tag_t tag,
-                          value_t req_size,
-                          value_t* root) {
+                          value_t req_size) {
   uint8_t extra = req_size ? 0 : 1;
   uint32_t capacity = req_size + extra;
 
@@ -114,29 +116,141 @@ value_t* memory_get_block(memory* self,
     }
   }
   return NULL;
-} 
+}
 
-void memory_collect_garbage(memory* self, value_t* root) {
-  /// TODO:
-  fail("no garbage collection");
+/**
+ * @brief 
+ * 
+ * @param self 
+ * @param root 
+**/
+void memory_dfs(memory* self, value_t* root) {
   value_t* ptr = root;
-  for (int i = 0; i < block_size(root); i++){
+  for (uint32_t i = 0; i < block_size(root); i++) { // not block capacity!
+    /// Verify pointer points inside heap
+    value_t v_forage = *ptr;
+    if (v_forage &  0x3                                     || // value looks like a pointer
+        v_forage <  addr_p_to_v(self->start, self->free) ||
+        v_forage >= addr_p_to_v(self->start, self->end)) {
+      continue;
+    }
+    value_t* p_forage = addr_v_to_p(self->start, v_forage);
+    uint32_t bitmap_idx = (uint32_t) (p_forage - self->free);
+    /// check bitmap entry
+    if (self->bitmap[bitmap_idx >> 5] & (((uint32_t) 1) << (bitmap_idx & 0x1F))) { // value is almost a pointer
+      /* reset bitmap entry
+       *
+       * A catch is that the current frame, as root, will not be marked. This
+       * is not a problem now that we do not sweep top-frame blocks for
+       * garbage collection.
+       */
+      self->bitmap[bitmap_idx >> 5] &= ~(((uint32_t) 1) << (bitmap_idx & 0x1F));
+      memory_dfs(self, p_forage);
+    }
     ptr++;
   }
+}
+
+/**
+ * @brief 
+ * 
+ * @param self 
+**/
+void memory_sweep(memory* self) {
+  /// delete original free list
+  value_t* tails[NUM_HEAD];
+  for (uint32_t i = 0; i < NUM_HEAD; i++) {
+    self->heads[i] = UINT32_MAX;
+    tails[i] = &self->heads[i];
+  }
+
+  value_t* fb_wip = NULL;
+  uint32_t fb_size = 0;
+  
+  value_t* sweep = &self->free[HEADER_SIZE];
+  /// linearly traverse heap
+  for ( ; sweep < self->end; ) {
+    uint32_t bitmap_idx = (uint32_t) (sweep - self->free);
+    bool bit_set = self->bitmap[bitmap_idx >> 5] & (((uint32_t) 1) << (bitmap_idx & 0x1F));
+    // allocated reachable block
+    if (block_tag(sweep) != tag_FreeBlock && !bit_set) {
+      /// set bitmap entry of reachable blocks backto 1
+      self->bitmap[bitmap_idx >> 5] |= ((uint32_t) 1) << (bitmap_idx & 0x1F);
+      
+      if (fb_wip) {
+        /// reset memory content
+        memset(fb_wip, 0, fb_size * sizeof(value_t));
+        /// insert new (coalesced) free block
+        uint32_t idx = min(fb_size - 1, NUM_HEAD - 1);
+        *tails[idx] = addr_p_to_v(self->start, fb_wip); // insert to tail
+        tails[idx] = fb_wip;
+
+        fb_wip = NULL; // reset coalesced free block pointer
+        fb_size = 0;   // reset coalesced free block size
+      }
+    }
+    // free block or allocated unreachable block
+    else {
+      if (!fb_wip) { // new free block WIP
+        fb_wip = sweep;
+        fb_size = block_capacity(sweep);
+      } else {
+        fb_size += block_capacity(sweep) + HEADER_SIZE;
+      }
+      /// reset bitmap entry of allocated unreachable block to 0
+      self->bitmap[bitmap_idx >> 5] &= ~(((uint32_t) 1) << (bitmap_idx & 0x1F));
+    }
+    sweep += block_capacity(sweep) + HEADER_SIZE;
+  }
+  /* In case the trailing blocks of the heap are all free, perform an
+   * additional round of "collection".
+   */
+  if (fb_wip) {
+    memset(fb_wip, 0, fb_size * sizeof(value_t));
+    uint32_t idx = min(fb_size - 1, NUM_HEAD - 1);
+    *tails[idx] = addr_p_to_v(self->start, fb_wip); // insert to tail
+    tails[idx] = fb_wip;
+  }
+  
+  for (uint32_t i = 0; i < NUM_HEAD; i++) {
+    *tails[i] = UINT32_MAX;
+  }
+}
+
+/**
+ * @brief 
+ * 
+ * @param self 
+ * @param root 
+**/
+void memory_collect_garbage(memory* self, value_t* root) {
+  memory_dfs(self, root); /// mark
+  if (root == TFB_0) {
+    if (root[1] == addr_p_to_v(self->start, TFB_1)) {
+      memory_dfs(self, TFB_1);
+    }
+  } else if (root == TFB_1) {
+    if (root[1] == addr_p_to_v(self->start, TFB_0)) {
+      memory_dfs(self, TFB_0);
+    }
+  } else {
+    fail("root frame is not top-frame block");
+  }
+  memory_sweep(self);     /// sweep
 }
 
 value_t* memory_allocate(memory* self,
                          tag_t tag,
                          value_t size,
                          value_t* root) {
-  value_t* block = memory_get_block(self, tag, size, root);
+  value_t* block = memory_get_block(self, tag, size);
   if (!block) {
     memory_collect_garbage(self, root); /// garbage collection
   } else {
     return block;
   }
 
-  block = memory_get_block(self, tag, size, root);
+  block = memory_get_block(self, tag, size);
   if (!block) {
     fail("no memory left (block of size %u requested)", size);
   } else {
