@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <assert.h>
 #include <stdbool.h>
 #include <string.h>
 
@@ -75,7 +74,6 @@ value_t* memory_get_block(memory* self,
       value_t* p_previous = addr_v_to_p(self->start, v_previous),
              * p_current = addr_v_to_p(self->start, v_current);
       value_t _block_size = block_size(p_current);
-      assert(_block_size - 1 >= idx);
       if ((_block_size == capacity) || (_block_size == capacity + 1)) {
         if (_block_size == capacity + 1) {
           extra += 1;
@@ -133,9 +131,9 @@ void memory_dfs(memory* self, value_t* root) {
     if ((v_forage &  0x3)                                || // value looks like a pointer
         v_forage <  addr_p_to_v(self->start, self->free) ||
         v_forage >= addr_p_to_v(self->start, self->end)) {
+      ptr++;
       continue;
     }
-    printf("ANCHOR 4\n");
 
     value_t* p_forage = addr_v_to_p(self->start, v_forage);
     uint32_t bitmap_idx = (uint32_t) (p_forage - self->free);
@@ -148,7 +146,6 @@ void memory_dfs(memory* self, value_t* root) {
        * garbage collection.
        */
       self->bitmap[bitmap_idx >> 5] &= ~(((uint32_t) 1) << (bitmap_idx & 0x1F));
-      printf("ANCHOR 3: unset bitmap\n");
       memory_dfs(self, p_forage);
     }
     ptr++;
@@ -170,12 +167,6 @@ int countSetBits(uint32_t n) {
  * @param self 
 **/
 void memory_sweep(memory* self) {
-  // value_t* bm = self->bitmap;
-  // for (; bm < self->free; bm ++){
-  //   //count the num of bits that = 1
-  //   uint32_t count = countSetBits(*bm);
-  //   printf("bitmap entry: %d\n", count);
-  // }
   /// delete original free list
   value_t* tails[NUM_HEAD];
   for (uint32_t i = 0; i < NUM_HEAD; i++) {
@@ -195,7 +186,7 @@ void memory_sweep(memory* self) {
     if (block_tag(sweep) != tag_FreeBlock && !bit_set) {
       /// set bitmap entry of reachable blocks backto 1
       self->bitmap[bitmap_idx >> 5] |= ((uint32_t) 1) << (bitmap_idx & 0x1F);
-      printf("ANCHOR 1\n");
+      //("ANCHOR 1\n");
 
       if (fb_wip) {
         /// reset memory content
@@ -227,7 +218,6 @@ void memory_sweep(memory* self) {
    * additional round of "collection".
    */
   if (fb_wip) {
-    printf("ANCHOR 2\n");
     memset(fb_wip, 0, fb_size * sizeof(value_t));
     block_set_extra_tag_size(fb_wip, 0, tag_FreeBlock, fb_size);
     uint32_t idx = min(fb_size - 1, NUM_HEAD - 1);
@@ -237,18 +227,6 @@ void memory_sweep(memory* self) {
   
   for (uint32_t i = 0; i < NUM_HEAD; i++) {
     *tails[i] = UINT32_MAX;
-  }
-}
-
-void print_linked_list_lengths(memory* self) {
-  for (int i = 0; i < NUM_HEAD; i++) {
-    int count = 0;
-    value_t head = self->heads[i];
-    while (head != UINT32_MAX) {
-      count++;
-      head = *addr_v_to_p(self->start, head);
-    }
-    printf("Linked List %d: %d elements\n", i, count);
   }
 }
 
@@ -280,12 +258,7 @@ value_t* memory_allocate(memory* self,
                          value_t* root) {
   value_t* block = memory_get_block(self, tag, size);
   if (!block) {
-    printf("\ncollecting garbage, free list before: \n");
-    //print_linked_list_lengths(self);
     memory_collect_garbage(self, root); /// garbage collection
-    printf("free list after GC: \n");
-    //print_linked_list_lengths(self);
-
   } else {
     return block;
   }

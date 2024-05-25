@@ -24,20 +24,13 @@ CFLAGS_DEBUG=${CFLAGS_COMMON} ${CLANG_SAN_FLAGS} -g
 # Flags for maximum performance:
 CFLAGS_RELEASE=${CFLAGS_COMMON} -O3 -DNDEBUG -fomit-frame-pointer
 
-CFLAGS=${CFLAGS_DEBUG}
-
-LLDBFLAGS=-DCMAKE_BUILD_TYPE=Debug \
-          -DLLDB_EXPORT_ALL_SYMBOLS=ON
+CFLAGS=${CFLAGS_RELEASE}
 
 all: vm
 
 vm: ${SRCS}
 	mkdir -p bin
 	clang ${CFLAGS} ${LDFLAGS} ${SRCS} -o bin/vm
-
-debug: ${SRCS}
-	mkdir -p bin
-	clang ${CFLAGS} ${LDFLAGS} ${SRCS} ${LLDBFLAGS} -o bin/vm
 
 test: vm
 	(cd ../test; shelltest -D VM=../c/bin/vm *test)

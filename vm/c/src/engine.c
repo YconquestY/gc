@@ -1,4 +1,4 @@
-#include <assert.h>
+//#include <assert.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
@@ -153,7 +153,7 @@ value_t engine_run(engine* self) {
   uint32_t //num_bit = ((uint32_t) self->memory->end - (uint32_t) self->free_boundary) >> 2,
            num_bit = (uint32_t) (self->memory->end - self->free_boundary),
            num_word = (num_bit + 33 - 1) / 33;
-  assert(num_bit > 1); // make sure there is space left after bitmap allocation
+  //assert(num_bit > 1); // make sure there is space left after bitmap allocation
   memory_set_bitmap(self->memory, self->free_boundary);
   self->free_boundary += num_word;
   memory_set_heap_start(self->memory, self->free_boundary);
@@ -300,12 +300,7 @@ value_t engine_run(engine* self) {
   INSTR_L(l_BSIZ, Ra = block_size(addr_v_to_p(memory_start, Rb)));
   INSTR_L(l_BTAG, Ra = block_tag(addr_v_to_p(memory_start, Rb)));
   INSTR_L(l_BGET, {
-      //assert(Rc < block_size(addr_v_to_p(memory_start, Rb)));
-      if (!(Rc < block_size(addr_v_to_p(memory_start, Rb)))) {
-        printf("block size: %u\n", block_size(addr_v_to_p(memory_start, Rb)));
-        printf("index: %u\n", Rc);
-        fail("invalid block access");
-      }
+      assert(Rc < block_size(addr_v_to_p(memory_start, Rb)));
       Ra = addr_v_to_p(memory_start, Rb)[Rc];
     });
   INSTR_L(l_BSET, {
