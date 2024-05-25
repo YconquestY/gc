@@ -150,12 +150,12 @@ value_t engine_run(engine* self) {
   value_t* memory_start = memory_get_start(self->memory);
 
   /// Allocate bitmap
-  uint32_t //num_bit = ((uint32_t) self->memory->end - (uint32_t) self->free_boundary) >> 2,
-           num_bit = (uint32_t) (self->memory->end - self->free_boundary),
-           num_word = (num_bit + 33 - 1) / 33;
-  //assert(num_bit > 1); // make sure there is space left after bitmap allocation
+  uint32_t v_bitmap_end = (uint32_t) (((uint64_t) addr_p_to_v(self->memory->start, self->memory->end) +
+                                       (uint64_t) addr_p_to_v(self->memory->start, self->free_boundary) * (uint64_t) 32 +
+                                       (uint64_t) (33 - 1)) / (uint64_t) 33);
+  v_bitmap_end = ((v_bitmap_end + 4 - 1) >> 2) << 2;
   memory_set_bitmap(self->memory, self->free_boundary);
-  self->free_boundary += num_word;
+  self->free_boundary = addr_v_to_p(self->memory->start, v_bitmap_end);
   memory_set_heap_start(self->memory, self->free_boundary);
 
   /// Initialize free list heads
