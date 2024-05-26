@@ -4,27 +4,32 @@
 #include "vmtypes.h"
 #include "memory.h"
 
-/* The initial header format is
- *     tag | size
- *      8b |  24b
- * which is not expressive enough when considering garbage collection. Suppose
- * a free block has size 2, and that the requested size is 1. There will be 1
- * word left if we allocate such a free block. However, the left word cannot
- * sustain a new free block, which requires at least 2 words (1 header and 1
- * next-free-block pointer). The solution is the modify header format:
- *     extra | tag | size
- *        2b |  6b |  24b
- * and introduce the notion of "capacity". `extra` field is the number of words
- * that block capacity exceeds block size. Note that block capacity is as most
- * 2 larger than block size, demonstrated below:
- *     requested block: size 0
- *     free list      : only 1 free block of size 2
+/* There are 2 challenges regarding block management:
+ * 1. impossinlie split;
+ *    Suppose the only avalilable free block has size 6. Given a request of
+ *    size 5, block allocation will fail because we cannot split a free block
+ *    of size 1. A free block comprises at least a header and a pointer to the
+ *    next block, which is 2 words in total. In this case, one may reject the
+ *    request for perform garbage collection, see
+ *    https://edstem.org/eu/courses/1102/discussion/114055?answer=215575
+ * 2. request 0.
+ *    A request of size 0 should be granted with a block of "size" 1. Otherwise,
+ *    the block cannot be freed because it has no place for a pointer.
  * 
- * Note that
- * 1. block capacity is necessary for strings and functions in that they are
- *    represented as block (of characters/closure). Block size matters;
- * 2. a free block or top-frame block must have its `extra` field set to 0, but
- *    the in-heap copy of a top-frame block may have `extra` 1.
+ * What makes it worse is that the 2 problems may come togher. We cannot
+ * naively set the block header with a size larger than what is requested (by
+ * 1 or 2) to, e.g., preserve the accuracy of instruction `BSIZ`. As a
+ * solution, we introduct the concept of block capacity, which is the sum of
+ * requested size and the "extra" word allocated to the request. One may be
+ * tempted to record the "extra" field as block metadata, and the most viable
+ * way is to spare 2b from block tag to "extra", i.e.,
+ *     initial header → modified header
+ *     tag | size       extra | tag | size
+ *      8b |  24b          2b |  6b |  24b
+ * This is incorrect. Tag must be 8b even though we have only specified 4
+ * distinct ones. `~/compiler/src/l3/BlockTag.scala` can dynamically generate
+ * new flags (also see
+ * https://edstem.org/eu/courses/1102/discussion/114055?comment=217765). 
  */
 
 // Header management
